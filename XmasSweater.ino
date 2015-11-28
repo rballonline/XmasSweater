@@ -1,10 +1,21 @@
 #include <Adafruit_NeoPixel.h>
+#include "Timer.h"
+
 #ifdef __AVR__
   #include <avr/power.h>
 #endif
 
 #define PIN 6
+#define MIC_PIN   A9  // Microphone is attached to this analog pin
+#define DC_OFFSET  0  // DC offset in mic signal - if unusure, leave 0
+#define NOISE     10  // Noise/hum/interference in mic signal
+#define SAMPLES   60  // Length of buffer for dynamic level adjustment
 
+int
+  lvl       = 10,      // Current "dampened" audio level
+  minLvlAvg = 0,      // For dynamic adjustment of graph low & high
+  maxLvlAvg = 512;
+Timer t;
 // Parameter 1 = number of pixels in strip
 // Parameter 2 = Arduino pin number (most are valid)
 // Parameter 3 = pixel type flags, add together as needed:
@@ -26,12 +37,30 @@ void setup() {
   #endif
   // End of trinket special code
 
+  Serial.begin(1200);
 
   strip.begin();
   strip.show(); // Initialize all pixels to 'off'
+
+  int tickEvent = t.every(10, setTheBrightness);
+
+  
+}
+
+void setTheBrightness() {  
+  int      n, height;
+  n   = analogRead(MIC_PIN);                        // Raw reading from mic 
+  n   = abs(n - 512 - DC_OFFSET); // Center on zero
+  n   = (n <= NOISE) ? 0 : (n - NOISE);             // Remove noise/hum
+  lvl = ((lvl * 7) + n) >> 3;    // "Dampened" reading (else looks twitchy)
+  //strip.setBrightness(map(lvl, 1, 500, 100, 255));
+  Serial.print("Bloop: ");
+  Serial.println(lvl);
 }
 
 void loop() {
+  t.update();
+  
   theaterChase(strip.Color(255, 0, 0), strip.Color(127, 127, 127), 6, 500);
   rainbow(20);
   theaterChase(strip.Color(50, 50, 255), strip.Color(127, 127, 127), 6, 500);
